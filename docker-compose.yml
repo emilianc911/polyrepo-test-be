@@ -4,9 +4,15 @@ x-app-env: &app-env
 
   PGHOST: db
   PGPORT: 5432
-  PGUSER: ${PGUSER:-app}
-  PGPASSWORD: ${PGPASSWORD:-app}
-  PGDATABASE: ${PGDATABASE:-app}
+  # NOTE: do NOT change these defaults across releases. The `postgres` image
+  # only honours POSTGRES_USER/PASSWORD/DB on the *first* boot of an empty
+  # data volume; later boots ignore them. Changing the defaults bricks any
+  # already-deployed environment whose volume was initialised with the old
+  # values. See `migrations/001_init.sql` for how the actual schema is
+  # bootstrapped (idempotently, by `src/migrate.ts`, on every API start).
+  PGUSER: ${PGUSER:-todos}
+  PGPASSWORD: ${PGPASSWORD:-todos}
+  PGDATABASE: ${PGDATABASE:-todos}
 
   REDIS_URL: redis://cache:6379
 
@@ -30,16 +36,20 @@ services:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_USER:     ${PGUSER:-app}
-      POSTGRES_PASSWORD: ${PGPASSWORD:-app}
-      POSTGRES_DB:       ${PGDATABASE:-app}
+      POSTGRES_USER:     ${PGUSER:-todos}
+      POSTGRES_PASSWORD: ${PGPASSWORD:-todos}
+      POSTGRES_DB:       ${PGDATABASE:-todos}
     volumes:
       - db-data:/var/lib/postgresql/data
-      - ./migrations:/docker-entrypoint-initdb.d:ro
+      # Migrations are NOT mounted as docker-entrypoint-initdb.d any more.
+      # /docker-entrypoint-initdb.d is only honoured on first boot of an empty
+      # data dir, which makes schema evolution invisible to anyone who already
+      # deployed the project. Schema is owned by the BE itself and applied on
+      # every API start by src/migrate.ts (idempotently, with an advisory lock).
     ports:
       - "${PGPORT_HOST:-5432}:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${PGUSER:-app} -d ${PGDATABASE:-app}"]
+      test: ["CMD-SHELL", "pg_isready -U ${PGUSER:-todos} -d ${PGDATABASE:-todos}"]
       interval: 5s
       timeout: 5s
       retries: 10

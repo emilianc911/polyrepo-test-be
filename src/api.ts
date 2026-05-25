@@ -8,6 +8,7 @@ import { ZodError } from "zod";
 import { config } from "./config.js";
 import { waitForDb } from "./db.js";
 import { logger } from "./logger.js";
+import { runMigrations } from "./migrate.js";
 import { waitForRedis } from "./redis.js";
 import { authRouter } from "./routes/auth.js";
 import { attachmentsRouter } from "./routes/attachments.js";
@@ -24,6 +25,8 @@ async function main() {
 
   await waitForDb();
   logger.info("db ready");
+  await runMigrations();
+  logger.info("schema ready");
   await waitForRedis();
   logger.info("redis ready");
   await waitForS3();

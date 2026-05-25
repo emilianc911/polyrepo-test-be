@@ -3,7 +3,7 @@
 Backend half of the polyrepo demo: a small but real project-management API. Pairs with [`polyrepo-test-fe`](https://github.com/emilianc911/polyrepo-test-fe) over HTTP and WebSocket.
 
 - **Runtime:** Node.js 20 + TypeScript + Express
-- **Database:** PostgreSQL 16
+- **Database:** PostgreSQL 16, schema applied at API startup by an idempotent migration runner (`src/migrate.ts`) — no reliance on Postgres' `/docker-entrypoint-initdb.d`, so re-deploys onto an existing volume Just Work
 - **Cache / pub-sub / queue:** Redis 7
 - **Object storage:** MinIO (S3-compatible) for attachments
 - **Email:** MailHog for SMTP capture in dev (worker emits welcome / task notifications)
@@ -66,7 +66,7 @@ curl http://localhost:4000/api/health
 curl http://localhost:4000/api/health/deep | jq
 ```
 
-The migration script seeds a demo user:
+A demo user is seeded by the migration runner:
 
 - email: `demo@polyrepo.local`
 - password: `demo1234`
@@ -97,6 +97,24 @@ docker compose up -d --build
 | `mail`    | `mailhog/mailhog`    | `1025` SMTP + `8025` UI | Captures all outbound mail in dev    |
 
 Open the MinIO console at http://localhost:9001 (`minio` / `minio12345`) and MailHog at http://localhost:8025.
+
+## Schema migrations
+
+Schema is **owned by the BE process**, not by the Postgres image. On every API start, `src/migrate.ts`:
+
+1. Acquires `pg_advisory_lock(4242)` so concurrent `api`/`worker` boots don't race.
+2. Ensures a `schema_migrations(filename, applied_at)` table exists.
+3. Applies every `migrations/*.sql` file (lexicographic order) that isn't already in `schema_migrations`, each inside a transaction together with the `INSERT INTO schema_migrations`.
+
+Each `.sql` file is required to be idempotent: `CREATE TABLE IF NOT EXISTS …`, `CREATE INDEX IF NOT EXISTS …`, `INSERT … ON CONFLICT DO NOTHING`, `DO $$ BEGIN CREATE TYPE … EXCEPTION WHEN duplicate_object THEN NULL END $$;`. That means:
+
+- A fresh deployment: schema is created cleanly on first boot.
+- An existing deployment whose volume already had the schema: re-running the migration is a no-op.
+- An existing deployment whose volume only had a partial schema: the missing pieces are filled in.
+
+Adding new schema = drop a new file `migrations/002_*.sql` (idempotent statements) and ship. No need to touch Postgres init hooks.
+
+> **Important about credentials:** the defaults `PGUSER=todos / PGPASSWORD=todos / PGDATABASE=todos` are **stable across releases** for a reason: the `postgres` image only honours `POSTGRES_USER/PASSWORD/DB` on the very first boot of an empty volume. Changing them silently breaks any environment whose volume was initialised with the old values, because the API would then try to connect with creds that don't exist in `pg_authid`. Override via `.env` per environment if you want different ones, but don't change the defaults.
 
 ## Configuration
 
