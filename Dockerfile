@@ -1,14 +1,25 @@
 FROM node:20-alpine AS deps
 WORKDIR /app
 COPY package.json package-lock.json* ./
+RUN npm install
+
+FROM node:20-alpine AS build
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+RUN npm run build
+
+FROM node:20-alpine AS prod-deps
+WORKDIR /app
+COPY package.json package-lock.json* ./
 RUN npm install --omit=dev
 
 FROM node:20-alpine
 WORKDIR /app
-ENV NODE_ENV=production \
-    PORT=4000
-COPY --from=deps /app/node_modules ./node_modules
+ENV NODE_ENV=production
+COPY --from=prod-deps /app/node_modules ./node_modules
+COPY --from=build /app/dist ./dist
 COPY package.json ./
-COPY src ./src
 EXPOSE 4000
-CMD ["node", "src/server.js"]
+# Default to running the API. The worker container overrides CMD in compose.
+CMD ["node", "dist/api.js"]

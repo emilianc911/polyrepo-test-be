@@ -1,19 +1,48 @@
 {
   "name": "polyrepo-test-be",
-  "version": "0.1.0",
-  "description": "Polyrepo demo backend: Express REST API + PostgreSQL.",
+  "version": "0.2.0",
+  "description": "Polyrepo demo backend: Express + Postgres + Redis + MinIO + workers.",
   "private": true,
   "type": "module",
   "engines": {
     "node": ">=20"
   },
   "scripts": {
-    "start": "node src/server.js",
-    "dev": "node --watch src/server.js"
+    "build": "tsc -p tsconfig.json",
+    "start:api": "node dist/api.js",
+    "start:worker": "node dist/worker.js",
+    "dev:api": "tsx watch src/api.ts",
+    "dev:worker": "tsx watch src/worker.ts",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.620.0",
+    "@aws-sdk/s3-request-presigner": "^3.620.0",
+    "bcryptjs": "^2.4.3",
+    "bullmq": "^5.10.0",
     "cors": "^2.8.5",
     "express": "^4.19.2",
-    "pg": "^8.11.5"
+    "express-rate-limit": "^7.4.0",
+    "ioredis": "^5.4.1",
+    "jsonwebtoken": "^9.0.2",
+    "nanoid": "^5.0.7",
+    "nodemailer": "^6.9.14",
+    "pg": "^8.11.5",
+    "pino": "^9.3.2",
+    "pino-http": "^10.2.0",
+    "ws": "^8.18.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/jsonwebtoken": "^9.0.6",
+    "@types/node": "^20.14.10",
+    "@types/nodemailer": "^6.4.15",
+    "@types/pg": "^8.11.6",
+    "@types/ws": "^8.5.12",
+    "tsx": "^4.16.2",
+    "typescript": "^5.5.3"
   }
 }
